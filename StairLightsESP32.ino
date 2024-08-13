@@ -97,7 +97,7 @@ void setup()
   oledString[0] = "---";
   oledString[1] = "---";
   oledString[2] = "---";
-  oledString[3] = "Stairs V1";
+  oledString[3] = "Stair Lights V1.1";
   RefreshOLED(1);
 
   // set CPU freq to 80MHz, disable bluetooth  to save power
@@ -159,7 +159,9 @@ void setup()
   // YOU CANNOT DUPLICATE CLIENT NAMES!!!! (and expect them both to work anyway...)
   randomSeed(analogRead(0));
   mqttClientID += String(random(0xffff), HEX);
-  
+  oledString[3] = mqttClientID;
+  RefreshOLED(1);
+
   #ifdef DEBUG_VERBOSE
     Serial.print("MQTT Server: ");
     Serial.println(mqtt_server);
@@ -276,8 +278,10 @@ void setup()
     SaveCredentials();
   });
   ElegantOTA.begin(&server);    // Start ElegantOTA
+
   server.begin();
 
+  ElegantOTA.setAutoReboot(true);
   #ifdef DEBUG_EXTRA_VERBOSE
     Serial.println("Started OTA update page server");
   #endif
@@ -325,7 +329,6 @@ void loop()
     oledString[0] = "No WiFi";
     oledString[1] = "No MQTT";
     oledString[2] = "---";
-    oledString[3] = "---";
     RefreshOLED(1);
     delay(1000);
     return;
@@ -499,20 +502,20 @@ bool MQTT_Reconnect()
   while (!mqttConnect)// && (mqttAttemptCount < 10)) 
   {
     sprintf(mqttState, "Not connected");
-    #ifdef DEBUG_VERBOSE
-      Serial.printf("MQTT connect attempt %d ", (mqttAttemptCount + 1));
-      Serial.print(" Server IP: >");
-      Serial.print(mqttserverIP.toString());
-      Serial.print("< Port: >");
-      Serial.print(mqtt_portVal);
-      Serial.print("< mqttClientID: >");
-      Serial.print(mqttClientID);
-      Serial.print("< mqtt_user: >");
-      Serial.print(mqtt_user);
-      Serial.print("< mqtt_password: >");
-      Serial.print(mqtt_password);
-      Serial.println("<");
-    #endif
+    //#ifdef DEBUG_VERBOSE
+    Serial.printf("MQTT connect attempt %d ", (mqttAttemptCount + 1));
+    Serial.print(" Server IP: >");
+    Serial.print(mqttserverIP.toString());
+    Serial.print("< Port: >");
+    Serial.print(mqtt_portVal);
+    Serial.print("< mqttClientID: >");
+    Serial.print(mqttClientID);
+    Serial.print("< mqtt_user: >");
+    Serial.print(mqtt_user);
+    Serial.print("< mqtt_password: >");
+    Serial.print(mqtt_password);
+    Serial.println("<");
+    //#endif
     // Wait before retrying
     startDelay = millis();
     while((millis() - startDelay) < RECONNECT_DELAY)
@@ -523,7 +526,6 @@ bool MQTT_Reconnect()
     oledString[0] = "No WiFi";
     oledString[1] = "No MQTT";
     oledString[2] = "---";
-    oledString[3] = "---";
     RefreshOLED(1);
   }
   if(mqttConnect)
@@ -540,10 +542,10 @@ bool MQTT_Reconnect()
     MQTT_SubscribeTopics();
 
     oledString[0] = "WiFi & MQTT OK";
-    sprintf(tmpStr, "%d LEDs", NUMPIXELS);
+    sprintf(tmpStr, "%s", WiFi.localIP().toString().c_str());
     oledString[1] = tmpStr;
     oledString[2] = "---";
-    oledString[3] = "---";
+
     RefreshOLED(1);
     // send pattern names
     for(int patternIdx = 0; patternIdx < patternCount; patternIdx++)
@@ -572,9 +574,7 @@ bool MQTT_Reconnect()
     #endif
     sprintf(mqttState, "Connect failed");
     
-    oledString[1] = "No MQTT";
-    oledString[2] = "---";
-    oledString[3] = "---";
+    oledString[2] = "No MQTT";
     RefreshOLED(1);
   }
   return mqttConnect;
@@ -957,15 +957,14 @@ bool WiFi_Init()
       oledString[0] = "No WiFi";
       oledString[1] = "---";
       oledString[2] = "---";
-      oledString[3] = "---";
       RefreshOLED(1);
   }
   ip = WiFi.localIP().toString().c_str();
   sprintf(wifiState, "%s (%s) Connected ",WiFi.localIP().toString().c_str(), WiFi.getHostname());
   oledString[0] = "WiFi OK";
-  oledString[1] = "No MQTT";
-  oledString[2] = "---";
-  oledString[3] = "---";
+  sprintf(tmpStr, "%s", WiFi.localIP().toString().c_str());
+  oledString[1] = tmpStr;
+  oledString[2] = "No MQTT";
   RefreshOLED(1);
  
   #ifdef DEBUG_VERBOSE
@@ -1249,7 +1248,6 @@ void GetCredentials()
   oledString[0] = "Access Point";
   oledString[1] = "   ";
   oledString[2] = IP.toString();
-  oledString[3] = "---";
   RefreshOLED(1);  
 
   // Web Server Root URL
