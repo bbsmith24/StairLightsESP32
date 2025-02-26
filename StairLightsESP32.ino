@@ -191,12 +191,18 @@ void setup()
   server.on("/", HTTP_POST, [](AsyncWebServerRequest *request) 
   {
     int params = request->params();
+    // otherwise process the page
     for(int i=0;i<params;i++)
     {
       yield();
       const AsyncWebParameter* p = request->getParam(i);
       if(p->isPost())
       {
+        // reboot request button
+        if(p->name() == "reboot")
+        {
+          ESP.restart();
+        }
         // HTTP POST ssid value
         if (p->name() == PARAM_INPUT_1) 
         {
@@ -313,7 +319,9 @@ void setup()
   delay(1000);
   StripColor(  0, 0, 0,   0);
   lastUpdate = millis();
+  lastStatusUpdate = millis();
   MQTT_Reconnect();
+  CreateHTML();
 }
 //
 // main loop
@@ -344,6 +352,11 @@ void loop()
     lastUpdate = now;
     mqttClient.loop();
   }
+  //if((now - lastStatusUpdate) >= STATUS_INTERVAL_MS)
+  //{
+  //  lastStatusUpdate = now;
+  //  CreateHTML();
+  //}
   if((patternVal < 0) ||
      (patternVal > (patternCount + 1)))
   {
@@ -498,8 +511,8 @@ bool MQTT_Reconnect()
 {
   // Loop until we're reconnected
   mqttAttemptCount = 0;
-  bool mqttConnect = mqttClient.connected();
-  while (!mqttConnect)// && (mqttAttemptCount < 10)) 
+  mqttConnected = mqttClient.connected();
+  while (!mqttConnected)// && (mqttAttemptCount < 10)) 
   {
     sprintf(mqttState, "Not connected");
     //#ifdef DEBUG_VERBOSE
@@ -520,15 +533,16 @@ bool MQTT_Reconnect()
     startDelay = millis();
     while((millis() - startDelay) < RECONNECT_DELAY)
     {}
-    mqttConnect = mqttClient.connect(mqttClientID.c_str(), mqtt_user.c_str(), mqtt_password.c_str()); 
+    mqttConnected = mqttClient.connect(mqttClientID.c_str(), mqtt_user.c_str(), mqtt_password.c_str()); 
     mqttAttemptCount++;
 
     oledString[0] = "No WiFi";
     oledString[1] = "No MQTT";
     oledString[2] = "---";
     RefreshOLED(1);
+    CreateHTML();
   }
-  if(mqttConnect)
+  if(mqttConnected)
   {
     // we're connected
     #ifdef DEBUG_VERBOSE
@@ -577,7 +591,8 @@ bool MQTT_Reconnect()
     oledString[2] = "No MQTT";
     RefreshOLED(1);
   }
-  return mqttConnect;
+  CreateHTML();
+  return mqttConnected;
 }
 //****************************************************************************
 //
@@ -913,6 +928,7 @@ bool WiFi_Init()
       Serial.println("Undefined SSID");
     #endif    
     wifiConnected = false;
+    CreateHTML();
     return false;
   }
 
@@ -970,6 +986,7 @@ bool WiFi_Init()
   #ifdef DEBUG_VERBOSE
     Serial.println(wifiState);
   #endif
+  CreateHTML();
   return wifiConnected;
 }
 //
@@ -1424,6 +1441,8 @@ void ClearCredentials()
 //
 void CreateHTML()
 {
+  UpdateLocalTime();
+  lastUpdate = millis();
   Serial.println("Create /wifimanager.html");
   LITTLEFS_WriteFile(LittleFS, "/wifimanager.html", "<!DOCTYPE html>\n");
   LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", "<html>\n");
@@ -1487,7 +1506,26 @@ void CreateHTML()
   LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", tmpStr);
   LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", "            <hr/>\n");
 
-  LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", "            <input type =\"submit\" value =\"Submit\">\n");
+  LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", "            <label for=\"wifi_connect_status\">WIFI connect status</label>\n");
+  sprintf(tmpStr, "            <input type=\"text\" id =\"wifi_connect_status_value\" name=\"wifi_connect_status\" value = \"WiFi %s\"><br>\n", 
+                               (wifiConnected ? "OK" : "Not Connected"));
+  LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", tmpStr);
+
+  LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", "            <label for=\"mqtt_connect_status\">MQTT connect status</label>\n");
+  sprintf(tmpStr, "            <input type=\"text\" id =\"mqtt_connect_status_value\" name=\"mqtt_connect_status\" value = \"MQTT %s\"><br>\n", 
+                               (mqttConnected ? "OK" : "Not Connected"));
+  LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", tmpStr);
+
+  LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", "            <label for=\"connect_status_time\">Connect status updated</label>\n");
+  UpdateLocalTime();
+  sprintf(tmpStr, "            <input type=\"text\" id =\"connect_status_time\" name=\"connect_status_time\" value = \"%s\"><br>\n", localTimeStr); 
+  LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", tmpStr);
+
+  LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", "            <hr/>\n");
+
+  LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", "<button name=\"update\" type =\"submit\" value =\"update\">Update</button>");
+  LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", "<button name=\"reboot\" type =\"submit\" value =\"reboot\">Reboot</button>");
+ 
   LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", "          </p>\n");
   LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", "        </form>\n");
   LITTLEFS_AppendFile(LittleFS, "/wifimanager.html", "      </div>\n");

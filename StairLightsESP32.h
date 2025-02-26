@@ -115,6 +115,7 @@ IPAddress subnet(255, 255, 0, 0);
 // wifi state
 char wifiState[256];
 bool wifiConnected = false;
+bool mqttConnected = false;
 //
 // global variables for time
 //
@@ -193,6 +194,7 @@ int mqttAttemptCount = 0;
 uint mqttAttemptedReports = 0;
 uint mqttSuccessfulReports = 0;
 unsigned long lastUpdate;
+unsigned long lastStatusUpdate;
 // device specific
 // neopixel settings
 #define NUMPIXELS    14
@@ -210,7 +212,8 @@ uint8_t patternVal;
 //
 //
 //
-#define INTERVAL_MS 100  //  5  second interval to call mqttClient
+#define INTERVAL_MS          100  //  1  second interval to call mqttClient
+#define STATUS_INTERVAL_MS 300000  //  5 minute interval to update status text on webpage
 unsigned long startDelay = 0;
 //
 // 128x64 OLED display with Adafruit library
